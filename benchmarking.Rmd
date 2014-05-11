@@ -1,0 +1,220 @@
+Analýza Benchmarkingu - 350 firem
+========================================================
+
+V první části se budu zabývat analýzou 350 firem. Tato data jsem uložil na náš FaME server, Excel verzi jsem Vám zasílal 14.10.2013 v dokumentu *dotazniky_350_firem_10_14.xlsx*
+
+```{r}
+url <- "http://www.fame.utb.cz/pokr/POKR_data/Lubor/kvalitativni350.txt"
+data.in <- read.table(url, sep="\t", header=TRUE, encoding="UTF-8")
+dim(data.in) #počet řádků a sloupců
+# str(data.in) # dlouhý výstup, ale užitečné pro identifikaci názvů proměnných
+```
+Benchmarking je uveden u druhé otázky pod odpovědí *h*Upravím tedy naše data pouze o tuto proměnnou:
+
+```{r}
+data.bench <- data.in[ ,c("stari", "zamereni", "pocet_zam", "X2h_vyuz")]
+colnames(data.bench) <- c("stari", "zamereni", "velikost","bench.vyuziva" )
+head(data.bench, 5) # prvních 5 firem
+```
+Transformace proměnné bench. využívá:
+------------------------
+Některé odpovědi jsou NA. Těmto tyto firmy tedy budou označeny jako 0 a tedy nevyužívají
+```{r}
+data.bench$bench.vyuziva[which(is.na(data.bench$bench.vyuziva))] <-0
+```
+
+Přehledová tabulka proměnné *bench.vyuziva*
+```{r}
+table(data.bench$bench.vyuziva)
+```
+Za využívá označíme ty firmy, které ji využívají déle než 2 roky:
+```{r}
+data.bench$bench.v <- ifelse(data.bench$bench.v <2, 0, 1)
+head(data.bench, 5) # zkontrolujte s tabulkou ve druhém chunk
+```
+Proměnná velikost:
+------------------------
+Velikost měřená počtem zaměstnaců je 4-úrovňová:
+```{r}
+table(data.bench$velikost)
+```
+Kombinace *velikosti* a využívání benchmarkingu je následující:
+```{r}
+tab.velikosti <- table(data.bench$bench.v, data.bench$velikost)
+colnames(tab.velikosti) <- c("<10", "10-49", "50-249", "250+")
+rownames(tab.velikosti) <- c("nevyužívá", "využívá")
+tab.velikosti
+```
+analýza asociace $\chi^2$:
+```{r}
+chi.velikost <- chisq.test(tab.velikosti)
+chi.velikost
+```
+Hypotézu na nezávislosti na hladině významnosti 5 % zamítáme, protože p-value = `r chi.velikost$p.value `.  
+Pokud bychom se blíže podívali na důvod zamítnutí:
+```{r}
+chi.velikost$residuals
+```
+tak příliš mnoho velkých firem používá BSC (nebo, samozřejmě, příliš málo velkých firem nepoužívá BSC). Pokud by chyba byla 0 nebo blízká nule, potom je to přesně s naším očekáváním v případě nezávislosti. Kladná hodnota značí vyšší počet firem, než bychom očekávali v případě nezávislosti.
+
+Proměnná zaměření:
+------------------------
+Velikost měřená počtem zaměstnaců je 4-úrovňová:
+```{r}
+table(data.bench$zamereni)
+```
+Jiné firmy (`r length(which(data.bench$zamereni==4))` firmy)  jsou převedeny do výroby (sama můžete změnit změnou hodnoty za <- v následujícím chunk):
+
+```{r}
+data.bench[which(data.bench$zamereni==4), "zamereni"] <- 1 #1-výroba, 2-služby, 3-obchod
+table(data.bench$zamereni)
+```
+
+Kombinace *zamereni* a využívání benchmarkingu je následující:
+```{r}
+tab.sektor <- table(data.bench$bench.v, data.bench$zamereni)
+colnames(tab.sektor) <- c("výroba", "služby", "obchod")
+rownames(tab.sektor) <- c("nevyužívá", "využívá")
+tab.velikosti
+```
+analýza asociace $\chi^2$:
+```{r}
+chi.sektor <- chisq.test(tab.sektor)
+chi.sektor
+```
+Hypotézu na nezávislosti na hladině významnosti 5 % nezamítáme, protože p-value = `r chi.sektor$p.value `. Nemáme důkaz o přítomnosti asociace mezi zaměřením a používáním benchmarkingu.
+
+Proměnná stáří:
+------------------------
+Velikost měřená počtem zaměstnaců je 3-úrovňová:
+```{r}
+table(data.bench$stari)
+```
+
+Kombinace *stáří* a využívání benchmarkingu je následující:
+```{r}
+tab.stari <- table(data.bench$bench.v, data.bench$stari)
+colnames(tab.stari) <- c("<1990", "1991-2001", ">2001")
+rownames(tab.stari) <- c("nevyužívá", "využívá")
+tab.stari
+```
+analýza asociace $\chi^2$:
+```{r}
+chi.stari <- chisq.test(tab.stari)
+chi.stari
+```
+Hypotézu na nezávislosti na hladině významnosti 5 % nezamítáme, protože p-value = `r chi.stari$p.value `. Nemáme důkaz o přítomnosti asociace mezi zaměřením a používáním benchmarkingu.
+
+
+Analýza Benchmarkingu - 167 firem
+========================================================
+```{r}
+url_kvantit <- "http://www.fame.utb.cz/pokr/POKR_data/Lubor/bench_kvantit.txt"
+data.kvantit <- read.table(url_kvantit, sep="\t", header=TRUE, encoding="UTF-8")
+str(data.kvantit)
+```
+Musím opět překódovat využití
+```{r}
+table(data.kvantit$X2h_vyuz)/3 #dělíme 3 protože každá firma je ve třech letech
+data.kvantit$bench.v <- ifelse(data.kvantit$X2h_vyuz>1, 1, 0) # 2+ let je =1
+```
+Očistíme data o extrémné hodnoty. Nejdříve načtu svůj skript, který jsem uložil na server. Je nutné mít nainstalovanou knihovu *TeachingDemos*. Viz níže:
+```{r}
+#install.packages(TeachingDemos) #odstraňte # na začátku a ctrl+r 
+cleaning.script <- "http://www.fame.utb.cz/pokr/POKR_data/Lubor/data_clean.r"
+source(cleaning.script)
+```
+Očistíme data v každém roce:
+```{r}
+rok2008 <- subset(data.kvantit, ROK_UZ==2008, select=c("ROA","ROE","PROA") )
+rok2009 <- subset(data.kvantit, ROK_UZ==2009, select=c("ROA","ROE","PROA") )
+rok2010 <- subset(data.kvantit, ROK_UZ==2010, select=c("ROA","ROE","PROA") )
+
+clean08 <- dataclean(rok2008)$data
+clean08$rok <- 2008
+clean08$vyuz <- data.kvantit[which(data.kvantit$ROK_UZ==2008), "bench.v"]
+
+head(clean08)
+
+clean09 <- dataclean(rok2009)$data
+clean09$rok <- 2009
+clean09$vyuz <- data.kvantit[which(data.kvantit$ROK_UZ==2009), "bench.v"]
+
+clean10 <- dataclean(rok2010)$data
+clean10$rok <- 2010
+clean10$vyuz <- data.kvantit[which(data.kvantit$ROK_UZ==2010), "bench.v"]
+
+clean.data <- as.data.frame(rbind(clean08, clean09, clean10))
+colnames(clean.data) <- c("ROA","ROE","PROA","rok", "vyuz")
+```
+
+K další analýze použiji knihovnu plyr - srovnání průměrů:
+```{r}
+library(plyr) #install.packages("plyr")
+# původní
+ddply(data.kvantit, .(ROK_UZ, bench.v), summarise,
+      prumROA= mean(ROA),
+      prumROE= mean(ROE),  
+      prumPROA= mean(PROA))
+# očištěná
+ddply(clean.data, .(rok, vyuz), summarise,
+      prumROA= mean(ROA),
+      prumROE= mean(ROE),  
+      prumPROA= mean(PROA))
+```
+a mediánů:
+```{r}
+# původní
+ddply(data.kvantit, .(ROK_UZ, bench.v), summarise,
+      medianROA= quantile(ROA)[3],
+      medianROE= quantile(ROE)[3],  
+      medianPROA= quantile(PROA)[3])
+# očištěná
+ddply(clean.data, .(rok, vyuz), summarise,
+      medianROA= quantile(ROA)[3],
+      medianROE= quantile(ROE)[3],  
+      medianPROA= quantile(PROA)[3])
+```
+Kontroloval jsem to, ale mediány jsou stejné u verze s odlehlými hodnotami a v čisté verzi. Otestuji tedy jejich rozdíl.  
+```{r}
+ddply(clean.data, .(rok), summarise, 
+    wilcox.ROA = wilcox.test(ROA ~ vyuz, alternative = "l")$p.value,
+    wilcox.ROE = wilcox.test(ROE ~ vyuz, alternative = "l")$p.value,
+    wilcox.PROA = wilcox.test(PROA ~ vyuz, alternative = "l")$p.value)
+```
+Test správnosti výpočtu:
+```{r}
+r09 <- subset(clean.data, rok==2009, select=c("ROA","vyuz"))
+wilcox.test(r09$ROA~r09$vyuz, alternative = "l")
+```
+Rozdíly sice existují, ale nejsou (mimo roku 2009) statisticky významné. Tyto rozdíly tedy mohly vziknout náhodou (sampling variance).
+
+
+------
+  
+    
+      
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
